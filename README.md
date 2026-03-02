@@ -66,8 +66,7 @@ python run_validity_experiment.py
 # 4. Generate paper tables
 python generate_paper_assets.py
 
-# 5. Compile paper
-cd paper && pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
+
 ```
 
 ### Quick personality assessment of any model
