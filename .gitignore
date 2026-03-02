@@ -1,6 +1,9 @@
 # Data & datasets
 data/
 
+# Paper (not for public repo)
+paper/
+
 # Results (too large for git)
 results/*.png
 results/*.json
