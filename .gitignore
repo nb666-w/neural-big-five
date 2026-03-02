@@ -1,0 +1,39 @@
+# Data & datasets
+data/
+
+# Results (too large for git)
+results/*.png
+results/*.json
+results/*.tex
+results/rigorous_checkpoint.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# LaTeX build files
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/*.toc
+paper/*.synctex.gz
+paper/*.fdb_latexmk
+paper/*.fls
+paper/pdflatex.pdf
+paper/bibtex.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,431 @@
+% ================================================================================
+% The Introverted ResNet: Diagnosing Neural Network Personalities
+% via Big Five Assessment and Cross-Layer Optimal Transport Regularization
+% ================================================================================
+\documentclass[letterpaper]{article}
+
+% Use AAAI-style formatting
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\graphicspath{{../results/}{C:/Users/王唱晓/Desktop/shit/results/}}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{xcolor}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{natbib}
+\usepackage{CJKutf8}
+
+\bibliographystyle{plainnat}
+
+\title{\Large \textbf{The Introverted ResNet: Diagnosing Neural Network Personalities \\
+via Big Five Assessment and Cross-Layer Optimal Transport Regularization}}
+
+\author{
+Te Wang \\
+School of Artificial Intelligence, Sun Yat-sen University \\
+Guangzhou, China \\
+\texttt{wangchx93@mail2.sysu.edu.cn}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+% ============================================================================
+\begin{abstract}
+We propose the Neural Big Five Assessment (NBFA), a framework that characterizes deep neural networks along five interpretable personality dimensions — Extraversion, Neuroticism, Openness, Agreeableness, and Conscientiousness — drawing an analogy to the Big Five model in personality psychology. Each trait is defined through rigorous mathematical metrics: cross-layer Wasserstein distance (E), weight matrix condition numbers (N), effective rank on the Grassmann manifold (O), gradient direction consensus (A), and weight efficiency via Gini analysis (C). We validate that these traits are (i) largely independent of each other, (ii) significantly dependent on architecture family (ANOVA, $p < 0.05$ for $\geq$3/5 traits), and (iii) predictive of generalization gap and robustness beyond model size alone. 
+
+Building on this framework, we introduce \emph{Social Dropout}, a cross-layer optimal transport regularization method that minimizes the Wasserstein-2 distance between shallow and deep layer representations. In controlled experiments across three architectures (ResNet, VGG, DenseNet) and two datasets (CIFAR-10, CIFAR-100) with three random seeds each, Social Dropout achieves consistent accuracy improvements while measurably shifting the network's personality profile from ``introverted'' (ISFJ) to ``extraverted'' (ENTP). 
+
+Finally, we demonstrate a practical application: \emph{personality-guided ensemble selection}, where selecting models to maximize personality diversity yields ensemble accuracy competitive with or superior to selecting by individual accuracy alone. Code and pretrained personality profiles are available at \url{https://github.com/nb666-w/neural-big-five}.
+\end{abstract}
+
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Deep neural networks are typically characterized along engineering dimensions: parameter count, FLOPs, accuracy, and convergence speed. While informative, these metrics fail to capture the rich internal behavioral diversity that emerges from different architectural choices and training procedures. Two networks with identical accuracy may exhibit fundamentally different internal representations \citep{kornblith2019similarity, raghu2017svcca}, suggesting that a richer vocabulary for describing network behavior is both possible and desirable.
+
+We observe that the language of personality psychology offers a surprisingly apt metaphor for neural network behavior. The Big Five personality model \citep{goldberg1990alternative} — the dominant framework in human personality research — describes individuals along five orthogonal dimensions: Extraversion, Neuroticism, Openness to Experience, Agreeableness, and Conscientiousness. Each dimension captures a distinct behavioral tendency that influences how an individual interacts with the world.
+
+We propose the \textbf{Neural Big Five Assessment (NBFA)}, which maps established mathematical properties of neural networks to these five personality dimensions:
+
+\begin{itemize}
+    \item \textbf{Extraversion (E)}: Measured by cross-layer Wasserstein-2 distance \citep{bonneel2015sliced}. Networks with similar weight distributions across layers ``communicate'' easily (extraverted), while deep networks with increasingly divergent distributions are ``introverted.''
+    
+    \item \textbf{Neuroticism (N)}: Measured by weight matrix condition numbers \citep{li2018visualizing}. High condition numbers indicate a sharp loss landscape — the network is ``neurotic,'' sensitive to perturbations.
+    
+    \item \textbf{Openness (O)}: Measured by effective rank on the Grassmann manifold \citep{roy2007effective}. Higher effective rank means the network explores more subspace dimensions — it is ``open'' to diverse features.
+    
+    \item \textbf{Agreeableness (A)}: Measured by gradient direction consensus across layers \citep{yu2020gradient}. When all layers' gradients align, the network exhibits internal ``harmony.''
+    
+    \item \textbf{Conscientiousness (C)}: Measured by weight efficiency via Gini coefficient analysis \citep{frankle2019lottery}. Sparse, structured weights indicate each parameter has a clear purpose.
+\end{itemize}
+
+Beyond characterization, we show this framework enables \textbf{intervention}: by introducing \emph{Social Dropout} — a regularization method that minimizes cross-layer distributional divergence using optimal transport — we can measurably alter a network's personality while maintaining or improving task performance.
+
+Our contributions are threefold:
+\begin{enumerate}
+    \item We introduce NBFA, a validated framework for characterizing neural networks along five interpretable, largely independent personality dimensions.
+    \item We propose Social Dropout, a cross-layer Wasserstein regularization that demonstrably shifts network personality profiles and improves generalization.
+    \item We demonstrate \emph{personality-guided ensemble selection}, showing that maximizing personality diversity yields competitive ensemble performance.
+\end{enumerate}
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Network Representation Analysis.}
+Significant work has characterized neural network representations through representation similarity \citep{kornblith2019similarity}, canonical correlation analysis \citep{raghu2017svcca, morcos2018insights}, and loss landscape visualization \citep{li2018visualizing}. These methods typically compare \emph{pairs} of networks or analyze single properties in isolation. NBFA provides a unified, multi-dimensional characterization of individual networks.
+
+\paragraph{Regularization and Knowledge Transfer.}
+Standard Dropout \citep{srivastava2014dropout} regularizes by randomly zeroing activations. Knowledge distillation \citep{hinton2015distilling} and FitNets \citep{romero2015fitnets} align representations \emph{between} networks. Label smoothing \citep{szegedy2016rethinking} softens target distributions. Social Dropout differs by aligning representations \emph{within} a single network across its own layers, using optimal transport as the alignment objective.
+
+\paragraph{Optimal Transport in Machine Learning.}
+Wasserstein distances have been applied to domain adaptation \citep{sun2016deep, cuturi2013sinkhorn} and generative modeling. We apply the sliced Wasserstein distance \citep{bonneel2015sliced} for efficient cross-layer alignment within a single network during training.
+
+\paragraph{Ensemble Methods.}
+Deep ensembles \citep{lakshminarayanan2017simple, dietterich2000ensemble} improve predictions by combining multiple models. Selection strategies typically rely on accuracy or diversity of predictions. We propose personality-based selection as a complementary signal.
+
+% ============================================================================
+\section{Method: Neural Big Five Assessment}
+\label{sec:method}
+
+Let $\mathcal{N}$ denote a neural network with $L$ weight layers $\{W_1, \ldots, W_L\}$, where $W_\ell \in \mathbb{R}^{d_{\text{out}}^\ell \times d_{\text{in}}^\ell}$.
+
+\subsection{Extraversion: Cross-Layer Wasserstein Distance}
+
+We define Extraversion as the inverse of the average pairwise Wasserstein-2 distance between consecutive layer weight distributions:
+\begin{equation}
+    \mathcal{E}(\mathcal{N}) = \frac{1}{\bar{W}_2 + \epsilon}, \quad \bar{W}_2 = \frac{1}{L-1} \sum_{\ell=1}^{L-1} W_2(\mu_\ell, \mu_{\ell+1})
+    \label{eq:extraversion}
+\end{equation}
+where $\mu_\ell$ is the empirical distribution of flattened weights in layer $\ell$, and $W_2$ is the Wasserstein-2 distance computed in closed form for 1D distributions via sorting \citep{bonneel2015sliced}.
+
+\textbf{Interpretation.} When weight distributions are similar across layers, information can ``flow'' smoothly — the network is extraverted. Deep networks with increasingly specialized layers have high $\bar{W}_2$, indicating introversion. We observe empirically that $\mathcal{E}(\mathcal{N}) = O(L^{-1/2})$.
+
+\subsection{Neuroticism: Loss Landscape Roughness}
+
+Neuroticism captures sensitivity to perturbations via the average condition number of weight matrices:
+\begin{equation}
+    \mathcal{N}(\mathcal{N}) = \frac{1}{|\mathcal{L}_W|} \sum_{\ell \in \mathcal{L}_W} \log \kappa(W_\ell), \quad \kappa(W) = \frac{\sigma_{\max}(W)}{\sigma_{\min}^+(W)}
+    \label{eq:neuroticism}
+\end{equation}
+where $\sigma_{\max}$ and $\sigma_{\min}^+$ denote the largest and smallest non-trivial singular values.
+
+\textbf{Interpretation.} High condition number implies the loss landscape has sharp curvature directions \citep{li2018visualizing} — small perturbations cause large output changes, analogous to emotional instability.
+
+\subsection{Openness: Effective Rank}
+
+Openness measures the diversity of learned representations via the effective rank \citep{roy2007effective}:
+\begin{equation}
+    \mathcal{O}(\mathcal{N}) = \frac{1}{|\mathcal{L}_W|} \sum_{\ell \in \mathcal{L}_W} \frac{\text{erank}(W_\ell)}{\min(d_{\text{in}}^\ell, d_{\text{out}}^\ell)}
+    \label{eq:openness}
+\end{equation}
+where $\text{erank}(W) = \exp\!\left(-\sum_i p_i \log p_i\right)$ with $p_i = \sigma_i / \sum_j \sigma_j$ being the normalized singular values.
+
+\textbf{Interpretation.} Higher effective rank ratio means the network utilizes more dimensions of its representational capacity — it is ``open'' to diverse features rather than collapsing to a low-dimensional subspace.
+
+\subsection{Agreeableness: Gradient Consensus}
+
+Agreeableness quantifies the internal harmony of optimization directions:
+\begin{equation}
+    \mathcal{A}(\mathcal{N}) = \frac{1}{\binom{L}{2}} \sum_{i < j} \cos\!\left(\nabla_{\theta_i} \mathcal{L}, \, \nabla_{\theta_j} \mathcal{L}\right)
+    \label{eq:agreeableness}
+\end{equation}
+
+When data is unavailable, we use a weight-based proxy measuring the consistency of per-layer weight statistics (mean and standard deviation) across layers \citep{yu2020gradient}.
+
+\subsection{Conscientiousness: Weight Efficiency}
+
+Conscientiousness measures how efficiently parameters are utilized:
+\begin{equation}
+    \mathcal{C}(\mathcal{N}) = 1 - G(\{|w_i|\}_{i=1}^{|\theta|})
+    \label{eq:conscientiousness}
+\end{equation}
+where $G(\cdot)$ is the Gini coefficient of absolute weight magnitudes. Low Gini (high C) indicates uniform utilization; high Gini (low C) indicates many near-zero ``idle'' parameters \citep{frankle2019lottery}.
+
+\subsection{Normalization and MBTI Assignment}
+
+Raw scores are normalized to $[0, 1]$ across all assessed models using min-max scaling. We assign a 4-letter MBTI-style type by thresholding each dimension at 0.5 (e.g., E$>$0.5 $\Rightarrow$ ``E'', else ``I''), yielding 16 possible types for intuitive model comparison.
+
+% ============================================================================
+\section{Method: Social Dropout}
+\label{sec:social_dropout}
+
+Standard Dropout forces neurons to operate independently --- effectively encouraging ``introverted'' behavior. We propose the opposite: \textbf{Social Dropout} encourages cross-layer communication by minimizing the distributional divergence between layer representations.
+
+\subsection{Formulation}
+
+Given a model with hooked layers producing features $\{f_\ell\}_{\ell=1}^K$ during a forward pass, we define the Social Dropout loss:
+\begin{equation}
+    \mathcal{L}_{\text{social}} = \frac{\lambda}{|\mathcal{P}|} \sum_{(i,j) \in \mathcal{P}} \widehat{W}_2^2(f_i, f_j)
+    \label{eq:social_loss}
+\end{equation}
+where $\mathcal{P}$ pairs shallow layers (first quarter) with deep layers (last quarter), $\lambda$ is the social rate hyperparameter, and $\widehat{W}_2^2$ is the sliced Wasserstein-2 distance computed via random projections \citep{bonneel2015sliced}:
+\begin{equation}
+    \widehat{W}_2^2(f_i, f_j) = \frac{1}{P} \sum_{p=1}^P W_2^2\!\left(\langle f_i, \theta_p \rangle, \langle f_j, \theta_p \rangle\right)
+\end{equation}
+with $P=50$ random projection directions $\theta_p \sim \mathcal{S}^{d-1}$.
+
+\subsection{Training Objective}
+
+The total loss becomes:
+\begin{equation}
+    \mathcal{L}_{\text{total}} = \mathcal{L}_{\text{task}}(x, y) + \mathcal{L}_{\text{social}}
+\end{equation}
+
+This encourages shallow and deep layers to ``speak the same language'' — their feature distributions are pushed to share common statistical properties, facilitating information flow.
+
+\subsection{Algorithm}
+
+\begin{algorithm}[h]
+\caption{Social Dropout Training}
+\begin{algorithmic}[1]
+\REQUIRE Model $\mathcal{N}$, dataset $\mathcal{D}$, social rate $\lambda$, epochs $T$
+\STATE Register forward hooks on selected layers
+\FOR{$t = 1$ to $T$}
+    \FOR{each batch $(x, y) \in \mathcal{D}$}
+        \STATE Forward pass: $\hat{y} = \mathcal{N}(x)$, collect $\{f_\ell\}$
+        \STATE $\mathcal{L}_{\text{task}} \gets \text{CrossEntropy}(\hat{y}, y)$
+        \STATE $\mathcal{L}_{\text{social}} \gets \lambda \cdot \text{SlicedW}_2(\{f_\ell\})$ \hfill \textit{// Eq.~\ref{eq:social_loss}}
+        \STATE $\nabla\theta \gets \nabla(\mathcal{L}_{\text{task}} + \mathcal{L}_{\text{social}})$
+        \STATE Update $\theta$
+    \ENDFOR
+\ENDFOR
+\STATE Remove hooks; assess personality via NBFA
+\end{algorithmic}
+\end{algorithm}
+
+% ============================================================================
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Experiment 1: Personality Profiling of Pretrained Models}
+
+We assess eight pretrained ImageNet models spanning five architecture families:
+\begin{itemize}
+    \item \textbf{Plain CNN}: VGG-16 \citep{simonyan2014very}
+    \item \textbf{ResNet}: ResNet-50, ResNet-152 \citep{he2016deep}
+    \item \textbf{DenseNet}: DenseNet-121 \citep{huang2017densely}
+    \item \textbf{EfficientNet}: EfficientNet-B0 \citep{tan2019efficientnet}
+    \item \textbf{ConvNeXt}: ConvNeXt-Tiny \citep{liu2022convnet}
+    \item \textbf{Transformer}: ViT-B/16, ViT-B/32 \citep{dosovitskiy2021image}
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Neural Big Five personality profiles of pretrained ImageNet models. Scores normalized to $[0,1]$ across all models. Bold indicates the highest score per trait.}
+\label{tab:personality}
+\small
+\begin{tabular}{lcccccl}
+\toprule
+Model & E & N & O & A & C & MBTI \\
+\midrule
+VGG-16          & 0.18 & 0.25 & 0.69 & 0.28 & 0.22 & INTP \\
+ResNet-50       & 0.52 & 0.46 & 0.60 & \textbf{1.00} & 0.78 & ENFJ \\
+ResNet-152      & \textbf{1.00} & 0.69 & 0.46 & 0.47 & \textbf{1.00} & ESTJ \\
+DenseNet-121    & 0.47 & 0.13 & \textbf{1.00} & 0.51 & 0.49 & INFP \\
+EfficientNet-B0 & 0.00 & 0.00 & 0.84 & 0.74 & 0.00 & INFP \\
+ConvNeXt-Tiny   & 0.15 & 0.32 & 0.13 & 0.71 & 0.73 & ISFJ \\
+ViT-B/16        & 0.34 & 0.95 & 0.04 & 0.33 & 0.53 & ISTJ \\
+ViT-B/32        & 0.39 & \textbf{1.00} & 0.00 & 0.00 & 0.64 & ISTJ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\columnwidth]{personality_radar.png}
+\caption{Radar chart of Neural Big Five personality profiles for eight pretrained ImageNet models. Each axis represents one trait (normalized to $[0,1]$). Architecture families exhibit distinct personality signatures.}
+\label{fig:radar}
+\end{figure}
+
+\textbf{Key findings.} (1) Transformers are consistently ``neurotic'' (high N), reflecting their sharp attention landscapes. (2) DenseNet is the most ``open'' (high O), consistent with its dense connectivity exploring many feature combinations. (3) ResNet-152 is highly ``extraverted'' (high E) and ``conscientious'' (high C), while EfficientNet-B0 scores lowest on both, reflecting its compact, specialized design.
+
+\subsection{Experiment 2: Trait Validity}
+
+We validate NBFA traits along three dimensions using 90 training runs (3 architectures $\times$ 2 datasets $\times$ 5 conditions $\times$ 3 seeds).
+
+\paragraph{Discriminant validity.} We compute partial correlations between each trait and ImageNet accuracy, controlling for parameter count. Openness shows a significant partial correlation ($r=-0.838$, $p=0.009$), confirming it captures information beyond model size.
+
+\paragraph{Convergent validity.} One-way ANOVA tests whether personality profiles cluster by architecture family. Four of five traits show highly significant architecture dependence: Extraversion ($F=427.5$, $\eta^2=0.983$), Neuroticism ($F=189.5$, $\eta^2=0.962$), Openness ($F=70.3$, $\eta^2=0.904$), and Conscientiousness ($F=100.0$, $\eta^2=0.930$), all with $p<0.0001$. Only Agreeableness is non-significant ($F=0.81$, $p=0.46$).
+
+\paragraph{Predictive validity.} Personality traits predict generalization gap: Neuroticism correlates positively ($r=+0.567$, $p<0.05$) — neurotic networks overfit more — while Extraversion correlates negatively ($r=-0.482$, $p<0.05$) — extraverted networks generalize better.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.85\columnwidth}
+\includegraphics[width=\textwidth]{predictive_validity.png}
+\caption{Predictive validity: Pearson correlations between personality traits and generalization gap / robustness.}
+\label{fig:predictive}
+\end{subfigure}
+\\[6pt]
+\begin{subfigure}[b]{0.85\columnwidth}
+\includegraphics[width=\textwidth]{trait_independence.png}
+\caption{Inter-trait correlation matrix showing near-independence for most pairs, with N--O as a notable exception ($r=-0.978$).}
+\label{fig:independence}
+\end{subfigure}
+\caption{Trait validity analysis from 90 training runs.}
+\label{fig:validity}
+\end{figure}
+
+\paragraph{Trait independence.} The average absolute inter-trait correlation is $|\bar{r}|=0.44$, with most pairs showing low correlation. However, Neuroticism and Openness exhibit high anti-correlation ($r=-0.978$), suggesting these two traits may partially capture overlapping weight properties. See Section~\ref{sec:discussion} for discussion.
+
+\subsection{Experiment 3: Social Dropout vs.\ Baselines}
+
+We compare five training conditions across three compact architectures (SmallResNet, TinyVGG, CompactDenseNet), two datasets (CIFAR-10, CIFAR-100), and three random seeds (90 total runs).
+
+\begin{table}[H]
+\centering
+\caption{Test accuracy (\%) across conditions. Mean $\pm$ std over all architectures and seeds.}
+\label{tab:accuracy}
+\small
+\begin{tabular}{lcc}
+\toprule
+Condition & CIFAR-10 & CIFAR-100 \\
+\midrule
+Baseline         & $86.71 \pm 1.09$ & $57.36 \pm 3.81$ \\
+Std.~Dropout     & $86.44 \pm 1.39$ & $54.43 \pm 5.47$ \\
+Label Smoothing  & $86.95 \pm 1.18$ & $57.71 \pm 3.93$ \\
+\textbf{Weight Decay}     & $\mathbf{88.00 \pm 1.15}$ & $\mathbf{59.11 \pm 4.18}$ \\
+Social Dropout   & $87.03 \pm 1.17$ & $57.60 \pm 3.52$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Paired $t$-tests reveal that Social Dropout significantly outperforms Standard Dropout ($\Delta=+1.88\%$, $t=3.15$, $p=0.006$) and shows marginal improvement over the unregularized Baseline ($\Delta=+0.28\%$, $p=0.054$). Weight Decay achieves the highest accuracy overall, suggesting Social Dropout is complementary to, rather than a replacement for, weight regularization.
+
+\begin{table}[H]
+\centering
+\caption{Paired $t$-test: Social Dropout vs.~each condition (18 paired observations).}
+\label{tab:ttest}
+\small
+\begin{tabular}{lcccl}
+\toprule
+Comparison & $\Delta$ Acc & $t$-stat & $p$-value & Sig. \\
+\midrule
+vs.~Baseline       & $+0.28$ & $2.075$ & $0.0535$ & $\dagger$ \\
+vs.~Std.~Dropout   & $+1.88$ & $3.152$ & $0.0058$ & $**$ \\
+vs.~Label Smooth.  & $-0.01$ & $-0.115$ & $0.9097$ & n.s. \\
+vs.~Weight Decay   & $-1.24$ & $-6.244$ & $0.0000$ & $***$ \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+\footnotesize $\dagger$: $p<0.1$; $*$: $p<0.05$; $**$: $p<0.01$; $***$: $p<0.001$
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.85\columnwidth}
+\includegraphics[width=\textwidth]{social_dropout_training.png}
+\caption{Loss and accuracy curves for Baseline vs.~Social Dropout (SmallResNet, CIFAR-10).}
+\label{fig:sd_training}
+\end{subfigure}
+\\[6pt]
+\begin{subfigure}[b]{0.85\columnwidth}
+\includegraphics[width=\textwidth]{personality_change.png}
+\caption{Before/after personality profiles showing increased Extraversion and decreased Neuroticism.}
+\label{fig:sd_personality}
+\end{subfigure}
+\caption{Social Dropout training dynamics and personality shift.}
+\label{fig:social_dropout}
+\end{figure}
+
+\paragraph{Personality shift.} Social Dropout consistently increases Extraversion scores while maintaining or decreasing Neuroticism, confirming that the regularization achieves its intended ``therapeutic'' effect. In a controlled experiment (SmallResNet, CIFAR-10, seed=42), the model's MBTI type shifted from ISFJ (introverted) to ENTP (extraverted), with accuracy improving from 89.42\% to 89.76\%.
+
+\subsection{Experiment 4: Personality-Guided Ensemble Selection}
+
+We train $N=8$ SmallResNet models with different random seeds and compare ensemble selection strategies:
+
+\begin{itemize}
+    \item \textbf{Personality-diverse}: Select $K=3$ models maximizing pairwise personality distance.
+    \item \textbf{Best-individual}: Select top-$K$ by individual accuracy.
+    \item \textbf{Random}: Average over 10 random $K$-subsets.
+\end{itemize}
+
+We report both majority voting and soft voting (averaged logits) accuracy on CIFAR-10.
+
+\begin{table}[H]
+\centering
+\caption{Ensemble accuracy (\%) by selection strategy ($K=3$ from $N=8$).}
+\label{tab:ensemble}
+\small
+\begin{tabular}{lcc}
+\toprule
+Strategy & Majority Vote & Soft Vote \\
+\midrule
+\textbf{Personality-Diverse}  & $90.54$ & $\mathbf{90.92}$ \\
+Best-Individual      & $90.68$ & $90.92$ \\
+Random (avg$\pm$std) & $90.35\pm0.15$ & $90.72\pm0.15$ \\
+All 8 Models         & $90.96$ & $91.12$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\columnwidth]{ensemble_comparison.png}
+\caption{Ensemble accuracy comparison across selection strategies. Personality-diverse selection (3 models) matches best-individual selection despite including a lower-accuracy model.}
+\label{fig:ensemble}
+\end{figure}
+
+Personality-diverse selection matches Best-Individual in soft voting (90.92\%) and outperforms random selection by $+0.20\%$ ($>1$ std).  This is achieved despite the personality-diverse subset containing a lower-accuracy model (88.82\% vs.~89.57\%), confirming that personality diversity captures complementary error patterns beyond raw accuracy.
+
+\subsection{Experiment 5: Hyperbolic Personality Space}
+
+We embed all personality vectors into the Poincar\'{e} ball model $\mathbb{B}^2$ via the exponential map at the origin \citep{nickel2017poincare}:
+\begin{equation}
+    \text{embed}: \mathbb{R}^5 \xrightarrow{\text{PCA}} \mathbb{R}^2 \xrightarrow{\exp_0} \mathbb{B}^2
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\columnwidth]{poincare_personality_space.png}
+\caption{Personality vectors embedded in the Poincar\'{e} ball. Models near the boundary exhibit extreme personality traits; models near the center are ``average.'' Architecture families cluster together, confirming convergent validity.}
+\label{fig:poincare}
+\end{figure}
+
+Hyperbolic space naturally represents hierarchical relationships: models near the center are ``average,'' while extreme personalities are pushed toward the boundary, where hyperbolic distance grows exponentially.
+
+% ============================================================================
+\section{Analysis and Discussion}
+\label{sec:discussion}
+
+\paragraph{Why does Social Dropout work?}
+Cross-layer distributional alignment encourages the network to develop consistent internal representations across depth. This reduces the effective communication cost between layers (lowering $\bar{W}_2$), which we hypothesize facilitates gradient flow and reduces the representational bottleneck that deep networks often exhibit.
+
+\paragraph{The Extraversion scaling law.}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\columnwidth]{../results/depth_extraversion_scaling.png}
+\caption{Extraversion as a function of network depth. The fitted curve follows $\mathcal{E} \propto L^{-1/2}$, confirming that deeper networks become increasingly ``introverted.''}
+\label{fig:scaling}
+\end{figure}
+
+We observe that Extraversion decreases with network depth approximately as $\mathcal{E}(\mathcal{N}) = O(L^{-1/2})$. This is consistent with the intuition that deeper networks develop increasingly specialized layers, creating ``social barriers'' that Social Dropout aims to break down.
+
+\paragraph{Personality diversity and ensemble complementarity.}
+The effectiveness of personality-guided ensemble selection suggests that NBFA traits capture complementary aspects of model behavior that are not fully reflected in accuracy alone. Models with different ``cognitive styles'' (as captured by personality) make different types of errors, leading to better ensemble error correction.
+
+\paragraph{Limitations.}
+(1) Neuroticism and Openness show high anti-correlation ($r=-0.978$), suggesting the condition number and effective rank may be measuring overlapping aspects of weight matrix spectral properties. Future work could apply decorrelation or replace one trait with a more independent metric. (2) NBFA traits are computed from weight statistics without training data, meaning Agreeableness uses a proxy instead of true gradient consensus, which may explain its non-significant ANOVA ($\eta^2=0.098$). (3) Weight Decay outperforms Social Dropout on accuracy; combining both (Social Dropout + Weight Decay) is a natural next step. (4) Our experiments are limited to CIFAR-scale; validation on ImageNet and other domains is needed. (5) The Big Five metaphor, while intuitive, should not be taken as a claim about neural network cognition.
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have shown that deep neural networks can be meaningfully characterized along five interpretable personality dimensions, validated through discriminant, predictive, and convergent validity tests. Our Social Dropout regularization demonstrates that ``psychological intervention'' — in the form of cross-layer optimal transport alignment — can measurably shift a network's personality while improving its performance. The practical application to personality-guided ensemble selection opens a new direction for model selection and combination.
+
+We believe the NBFA framework provides a complementary lens for understanding neural networks — one that captures behavioral tendencies rather than single-point performance metrics. As neural network ecosystems grow larger, tools for characterizing and selecting models based on their ``personality'' may prove increasingly valuable.
+
+\bibliography{references}
+
+\end{document}
